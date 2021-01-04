@@ -6,35 +6,52 @@
 
 const { default: axios } = require("axios");
 
-// Example of gathering latest Stack Exchange questions across multiple sites
-// Helpers for example
-const apiUrl = 'https://api.stackexchange.com/2.2/questions?pagesize=1&order=desc&sort=activity&site=',
-    sites = ['stackoverflow', 'ubuntu', 'superuser'],
-    myArrayOfData = sites.map(function (site) {
-        return {webAddress: apiUrl + site};
-    });
+require('dotenv').config()
 
-function convertToStringValue(obj) {
-    return JSON.stringify(obj, null, '\t');
-}
+let webRequestMainObject = {}, webRequestsPromises = [];
+var resultRepos = new Array();
 
-// Original question code
-let mainObject = {},
-    promises = [];
+axios.get('https://api.github.com/users/robertfsegal/starred', {                       
+             'headers': 
+             {
+                 'Authorization': `token ${process.env.GITHUB_PERSONAL_ACCESS_TOKEN}` 
+             }
+         }).then(r => {
+        
+            var pages = r.headers.link.match(/.*page=(\d+).*$/)[1];
 
-myArrayOfData.forEach(function (singleElement) {
-    const myUrl = singleElement.webAddress;
-    promises.push(axios.get(myUrl));
+            pageWebRequests = [];
+
+            for (var i = 0; i < pages; i++)
+            {
+                pageWebRequests.push("https://api.github.com/users/robertfsegal/starred?page=" + i);
+            }
+          
+          pageWebRequests.forEach(function (s) 
+          {
+            webRequestsPromises.push(axios.get(s));
+          });
+
+          Promise.all(webRequestsPromises).then(function (results) 
+          {
+                results.forEach(function (response) 
+                {
+                    response.data.forEach(function(result) {
+                        let item = {
+                            name     : result.name,
+                            html_url : result.html_url,
+                            desc     : result.description
+                        }
+
+                        resultRepos.push(item);
+                    });
+                });
+
+                resultRepos.forEach(function(r) {
+                    console.log(r);
+                });
+           });
 });
 
-Promise.all(promises).then(function (results) {
-    results.forEach(function (response) {
-        const question = response.data.items[0];
-        mainObject[question.question_id] = {
-            title: question.title,
-            link: question.link
-        };
-    });
 
-    console.log(convertToStringValue(mainObject));
-});
+        
